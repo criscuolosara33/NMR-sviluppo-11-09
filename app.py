@@ -527,7 +527,7 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
         segnali_visibili = []
 
         for sig in signals:
-            if nmr_type == '1h':
+            if nmr_type in ['1h', 'cosy']:
                 if (solv in ["D2O", "CD3OD"] and sig.get('is_exchangeable', False)): continue 
                 segnali_visibili.append(sig)
                 gamma_app = max(0.06, gamma_base) if sig.get('is_exchangeable', False) else gamma_base
@@ -828,4 +828,3 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
 
         st.markdown("---")
         st.download_button("Esporta Report Completo (PDF)", data=pdf_buffer.getvalue(), file_name="Report_NMR_Lab.pdf", mime="application/pdf", use_container_width=True)
-
