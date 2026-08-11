@@ -522,7 +522,6 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
                 st.markdown(f"<div class='debug-box'>{log_html}</div>", unsafe_allow_html=True)
 
         x_ppm = np.linspace(x_range[0], x_range[1], int(freq * 200))
-        # Correzione del fattore di forma applicato ai grafici monodimensionali in COSY
         gamma_base = 0.0025 * (500.0 / freq) if nmr_type in ['1h', 'cosy'] else 0.5
         y_intensity = np.zeros_like(x_ppm)
         segnali_visibili = []
@@ -618,7 +617,6 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
             ax_high.axis('off')
             st.pyplot(fig_highlight)
 
-        # Configurazione simmetrica degli assi e dello zoom
         molt_f = len(selected_mult) if len(selected_mult) > 0 else 1
         width_box = (0.05 * molt_f) * (500.0 / freq) if selected_delta else 0
         
@@ -705,13 +703,12 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
                 margin=dict(l=60, r=40, t=60, b=60), hovermode="closest", dragmode="zoom", showlegend=False
             )
             
-            # Ancoraggio linee di base 1D a intensità 0 e rimozione label superflui
             fig_cosy.update_yaxes(range=[0, y_max], showticklabels=False, showgrid=False, zeroline=False, row=1, col=1)
             fig_cosy.update_xaxes(range=[0, y_max], showticklabels=False, showgrid=False, zeroline=False, row=2, col=2)
             fig_cosy.update_xaxes(showticklabels=False, showgrid=False, zeroline=False, row=1, col=1)
             fig_cosy.update_yaxes(showticklabels=False, showgrid=False, zeroline=False, row=2, col=2)
 
-            # Assi Principali COSY - Correzione orientamento
+            # Assi Principali COSY - scaleanchor rimosso per svincolare l'asse F1 dall'orientamento inverso di F2
             fig_cosy.update_xaxes(
                 title_text="F2 - Chemical Shift δ (ppm)", range=zoom_range_x, showgrid=True, gridcolor='#E0E0E0', 
                 showticklabels=True, 
