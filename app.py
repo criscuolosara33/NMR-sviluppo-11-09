@@ -454,30 +454,44 @@ if st.session_state.stato_app == "input":
     modo_13c = c6.selectbox("Esperimento a Impulsi", ["Broadband", "DEPT-135", "DEPT-90", "APT"])
     
     st.markdown("<br>", unsafe_allow_html=True)
-    cb1, cb2, cb3 = st.columns(3)
+    cb1, cb2, cb3, cb4, cb5 = st.columns(5)
     
-    if cb1.button("Acquisisci Spettro 1H", use_container_width=True):
+    if cb1.button("Acquisisci 1H", use_container_width=True):
         if not smiles: st.error("Disegna una molecola.")
         else:
             st.session_state.parametri = {'freq': freq_1h, 'solvente': solv_1h, 'tech': '1h', 'temp': temp_1h}
             st.session_state.stato_app = "calcolo_1h"
             st.rerun()
             
-    if cb2.button("Acquisisci Spettro 13C", use_container_width=True):
+    if cb2.button("Acquisisci 13C", use_container_width=True):
         if not smiles: st.error("Disegna una molecola.")
         else:
             st.session_state.parametri = {'freq': freq_1h/4, 'solvente': solv_1h, 'tech': 'Broadband'} 
             st.session_state.stato_app = "calcolo_13c"
             st.rerun()
             
-    if cb3.button("Mappa COSY 2D", use_container_width=True):
+    if cb3.button("COSY 2D", use_container_width=True):
         if not smiles: st.error("Disegna una molecola.")
         else:
             st.session_state.parametri = {'freq': freq_1h, 'solvente': solv_1h, 'tech': 'cosy', 'temp': temp_1h}
             st.session_state.stato_app = "calcolo_cosy"
             st.rerun()
+            
+    if cb4.button("HMQC 2D", use_container_width=True):
+        if not smiles: st.error("Disegna una molecola.")
+        else:
+            st.session_state.parametri = {'freq': freq_1h, 'solvente': solv_1h, 'tech': 'hmqc', 'temp': temp_1h}
+            st.session_state.stato_app = "calcolo_hmqc"
+            st.rerun()
+            
+    if cb5.button("HMBC 2D", use_container_width=True):
+        if not smiles: st.error("Disegna una molecola.")
+        else:
+            st.session_state.parametri = {'freq': freq_1h, 'solvente': solv_1h, 'tech': 'hmbc', 'temp': temp_1h}
+            st.session_state.stato_app = "calcolo_hmbc"
+            st.rerun()
 
-elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]:
+elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy", "calcolo_hmqc", "calcolo_hmbc"]:
     if st.button("← Ritorna ai Parametri Strumentali", use_container_width=False):
         st.session_state.stato_app = "input"
         st.rerun()
@@ -505,29 +519,36 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
         elif st.session_state.stato_app == 'calcolo_13c':
             freq, solv, tech, nmr_type, plot_title, x_range = p['freq'], p['solvente'], p['tech'], '13c', f'Spettro 13C-NMR ({int(p["freq"])} MHz, {p["solvente"]})', [-10, 220]
             signals = stima_locale_13c(st.session_state.ultimo_smiles)
-        else:
+        elif st.session_state.stato_app == 'calcolo_cosy':
             freq, solv, tech, nmr_type, plot_title, x_range = p['freq'], p['solvente'], 'cosy', 'cosy', f'COSY 2D ({int(p["freq"])} MHz, {p["solvente"]})', [-0.5, 12.5]
             engine = get_spin_engine(st.session_state.ultimo_smiles, freq, p.get('temp', 25))
             signals = engine.get_signals_for_ui()
+        elif st.session_state.stato_app in ['calcolo_hmqc', 'calcolo_hmbc']:
+            freq, solv, tech, nmr_type = p['freq'], p['solvente'], p['tech'], p['tech']
+            plot_title = f'{tech.upper()} 2D ({int(p["freq"])} MHz, {p["solvente"]})'
+            x_range = [-0.5, 12.5]
+            engine = get_spin_engine(st.session_state.ultimo_smiles, freq, p.get('temp', 25))
+            signals = engine.get_signals_for_ui() # Segnali 1H
+            signals_13c = stima_locale_13c(st.session_state.ultimo_smiles) # Segnali 13C
 
         with st.expander("🔬 NMR DEBUG & Analisi Dinamica (Espandi)"):
             st.markdown("**1. Topologia ed Equivalenza**")
             for commento in analizza_simmetria_equivalenza(mol): st.markdown(commento)
             for commento in analizza_stereochimica(mol): st.markdown(commento)
             
-            if nmr_type in ['1h', 'cosy']:
+            if nmr_type in ['1h', 'cosy', 'hmqc', 'hmbc']:
                 st.markdown("**2. Propagazione Parametri & Log Motore di Spin**")
                 st.markdown(f"La frequenza di {freq} MHz converte il chemical shift in Hz per valutare la matrice $\Delta\\nu / J$.")
                 log_html = "<br>".join(engine.debug_log)
                 st.markdown(f"<div class='debug-box'>{log_html}</div>", unsafe_allow_html=True)
 
         x_ppm = np.linspace(x_range[0], x_range[1], int(freq * 200))
-        gamma_base = 0.0025 * (500.0 / freq) if nmr_type in ['1h', 'cosy'] else 0.5
+        gamma_base = 0.0025 * (500.0 / freq) if nmr_type in ['1h', 'cosy', 'hmqc', 'hmbc'] else 0.5
         y_intensity = np.zeros_like(x_ppm)
         segnali_visibili = []
 
         for sig in signals:
-            if nmr_type in ['1h', 'cosy']:
+            if nmr_type in ['1h', 'cosy', 'hmqc', 'hmbc']:
                 if (solv in ["D2O", "CD3OD"] and sig.get('is_exchangeable', False)): continue 
                 segnali_visibili.append(sig)
                 gamma_app = max(0.06, gamma_base) if sig.get('is_exchangeable', False) else gamma_base
@@ -548,7 +569,7 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
         df_data = []
         original_comments = {} 
         for sig in signals:
-            scambiato = (nmr_type == '1h' and solv in ["D2O", "CD3OD"] and sig.get('is_exchangeable', False))
+            scambiato = (nmr_type in ['1h', 'cosy', 'hmqc', 'hmbc'] and solv in ["D2O", "CD3OD"] and sig.get('is_exchangeable', False))
             scomparso_dept = False
             note_acc = sig['coupling_comment']
             if nmr_type == '13c':
@@ -559,11 +580,11 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
             shift_val = float(sig['delta'])
             original_comments[shift_val] = {'text': note_acc, 'tree_chars': sig.get('tree_chars', []), 'tree_js': sig.get('tree_js', [])}
             row = {'Shift (ppm)': "N/D" if scambiato or scomparso_dept else f"{shift_val:.2f}", 'Molteplicità': sig['multiplicity'] if not (scambiato or scomparso_dept) else "-", 'Atomi': ", ".join(map(str, sig['atoms'])), '_sort_val': shift_val}
-            if nmr_type == '1h': row['Integrale'] = sig['integral'] if not scambiato else "-"
+            if nmr_type in ['1h', 'cosy', 'hmqc', 'hmbc']: row['Integrale'] = sig['integral'] if not scambiato else "-"
             else: row['Tipo'] = sig.get('tipo_c', 'C')
             df_data.append(row)
             
-        df_signals_clean = pd.DataFrame(df_data).sort_values(by='_sort_val', ascending=False)[['Shift (ppm)', 'Integrale' if nmr_type == '1h' else 'Tipo', 'Molteplicità', 'Atomi']]
+        df_signals_clean = pd.DataFrame(df_data).sort_values(by='_sort_val', ascending=False)[['Shift (ppm)', 'Integrale' if nmr_type in ['1h', 'cosy', 'hmqc', 'hmbc'] else 'Tipo', 'Molteplicità', 'Atomi']]
 
         # --- SELEZIONE UI CONDIVISA TRA 1D/2D ---
         st.markdown("---")
@@ -622,10 +643,11 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
         
         # zoom_range_x decresce (High -> Low per convenzione asse F2 orizzontale)
         zoom_range_x = [selected_delta + width_box * 2.5, selected_delta - width_box * 2.5] if selected_delta else [x_range[1], x_range[0]]
-        # zoom_range_y cresce in Plotly in modo che il limite superiore sia ancorato al basso, mantenendo l'origine a destra
-        zoom_range_y = [selected_delta - width_box * 2.5, selected_delta + width_box * 2.5] if selected_delta else [x_range[0], x_range[1]]
-
+        
         if nmr_type == 'cosy':
+            # zoom_range_y cresce in Plotly in modo che il limite superiore sia ancorato al basso, mantenendo l'origine a destra
+            zoom_range_y = [selected_delta - width_box * 2.5, selected_delta + width_box * 2.5] if selected_delta else [x_range[0], x_range[1]]
+
             st.markdown("---")
             st.markdown("### Spettro COSY 2D")
             cross_peaks_idx = set()
@@ -708,7 +730,6 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
             fig_cosy.update_xaxes(showticklabels=False, showgrid=False, zeroline=False, row=1, col=1)
             fig_cosy.update_yaxes(showticklabels=False, showgrid=False, zeroline=False, row=2, col=2)
 
-            # Assi Principali COSY - scaleanchor rimosso per svincolare l'asse F1 dall'orientamento inverso di F2
             fig_cosy.update_xaxes(
                 title_text="F2 - Chemical Shift δ (ppm)", range=zoom_range_x, showgrid=True, gridcolor='#E0E0E0', 
                 showticklabels=True, 
@@ -721,7 +742,114 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
             )
             
             st.plotly_chart(fig_cosy, use_container_width=True)
+
+        elif nmr_type in ['hmqc', 'hmbc']:
+            st.markdown("---")
+            st.markdown(f"### Spettro {tech.upper()} 2D")
             
+            y_range_hetero = [-10, 220]
+            n_pts_x = 500
+            n_pts_y = 500
+            x_grid = np.linspace(x_range[0], x_range[1], n_pts_x, dtype=np.float32)
+            y_grid = np.linspace(y_range_hetero[0], y_range_hetero[1], n_pts_y, dtype=np.float32)
+            X, Y = np.meshgrid(x_grid, y_grid)
+            
+            gamma_x = np.float32(0.015 * (500.0 / freq))
+            gamma_y = np.float32(0.8) 
+            
+            Z = np.zeros_like(X, dtype=np.float32)
+            
+            for sigH in signals:
+                if sigH.get('is_exchangeable', False): continue
+                for sigC in signals_13c:
+                    coupled = False
+                    for hA in sigH['h_atoms']:
+                        for cB in sigC['atoms']:
+                            cB_idx = cB - 1
+                            try:
+                                path = Chem.GetShortestPath(mol_h, hA, cB_idx)
+                                path_len = len(path)
+                                if tech == 'hmqc' and path_len == 2:
+                                    coupled = True; break
+                                elif tech == 'hmbc' and path_len in [3, 4]:
+                                    coupled = True; break
+                            except: pass
+                        if coupled: break
+                    
+                    if coupled:
+                        for px, px_int in sigH['sub_peaks']:
+                            py = float(sigC['delta'])
+                            py_int = float(sigC['integral'])
+                            cp_int = np.float32(px_int * py_int * 0.5)
+                            Z += cp_int / (1.0 + ((X - px) / gamma_x)**2 + ((Y - py) / gamma_y)**2)
+                            
+            # Generazione Spettro 13C F1 (Asse Y)
+            y_intensity_13c = np.zeros_like(y_grid)
+            for sigC in signals_13c:
+                shift = float(sigC['delta'])
+                integ = float(sigC['integral'])
+                y_intensity_13c += integ / (1.0 + ((y_grid - shift) / 0.5)**2)
+                
+            fig_hetero = make_subplots(
+                rows=2, cols=2, 
+                shared_xaxes=True, shared_yaxes=True,
+                column_widths=[0.8, 0.2], row_heights=[0.2, 0.8],
+                horizontal_spacing=0.015, vertical_spacing=0.015
+            )
+            
+            # Traccia 1: Spettro 1D Superiore (1H F2)
+            fig_hetero.add_trace(
+                go.Scatter(x=x_ppm, y=y_intensity, mode='lines', line=dict(color=BORDEAUX, width=1.5), fill='tozeroy', fillcolor='rgba(107, 20, 34, 0.1)', hoverinfo='skip'), 
+                row=1, col=1
+            )
+            if selected_delta:
+                fig_hetero.add_vrect(x0=selected_delta + width_box, x1=selected_delta - width_box, fillcolor=BORDEAUX, opacity=0.18, line_width=0, row=1, col=1)
+
+            # Traccia 2: Mappa Eteronucleare 2D
+            fig_hetero.add_trace(
+                go.Contour(
+                    z=Z, x=x_grid, y=y_grid, 
+                    colorscale=[[0, 'white'], [1, BORDEAUX]], 
+                    showscale=False, 
+                    contours=dict(start=0.05, size=(np.max(Z) - 0.05) / 8 if np.max(Z) > 0.05 else 1, coloring='lines'), 
+                    line=dict(width=1.5), hoverinfo='x+y'
+                ), 
+                row=2, col=1
+            )
+
+            # Traccia 3: Spettro 1D Laterale (13C F1)
+            fig_hetero.add_trace(
+                go.Scatter(x=y_intensity_13c, y=y_grid, mode='lines', line=dict(color=BORDEAUX, width=1.5), fill='tozerox', fillcolor='rgba(107, 20, 34, 0.1)', hoverinfo='skip'), 
+                row=2, col=2
+            )
+
+            fig_hetero.update_layout(
+                title=plot_title, width=900, height=900, plot_bgcolor='white', font=dict(family="Palatino, serif"),
+                margin=dict(l=60, r=40, t=60, b=60), hovermode="closest", dragmode="zoom", showlegend=False
+            )
+            
+            # Formattazione e Ancoraggio Linee di Base
+            y_max_13c = np.max(y_intensity_13c) * 1.15 if np.any(y_intensity_13c) else 1
+            fig_hetero.update_yaxes(range=[0, y_max], showticklabels=False, showgrid=False, zeroline=False, row=1, col=1)
+            fig_hetero.update_xaxes(range=[0, y_max_13c], showticklabels=False, showgrid=False, zeroline=False, row=2, col=2)
+            fig_hetero.update_xaxes(showticklabels=False, showgrid=False, zeroline=False, row=1, col=1)
+            fig_hetero.update_yaxes(showticklabels=False, showgrid=False, zeroline=False, row=2, col=2)
+
+            zoom_range_y_hetero = [y_range_hetero[0], y_range_hetero[1]] # Standard 13C range
+            
+            fig_hetero.update_xaxes(
+                title_text="F2 (1H) - Chemical Shift δ (ppm)", range=zoom_range_x, showgrid=True, gridcolor='#E0E0E0', 
+                showticklabels=True, 
+                showspikes=True, spikemode="toaxis+across", spikethickness=1, spikedash="dot", spikecolor="gray", row=2, col=1
+            )
+            fig_hetero.update_yaxes(
+                title_text="F1 (13C) - Chemical Shift δ (ppm)", range=zoom_range_y_hetero, 
+                showgrid=True, gridcolor='#E0E0E0', showticklabels=True,
+                showspikes=True, spikemode="toaxis+across", spikethickness=1, spikedash="dot", spikecolor="gray", row=2, col=1
+            )
+            
+            st.plotly_chart(fig_hetero, use_container_width=True)
+
         else:
             if selected_delta is not None:
                 st.markdown("---")
@@ -820,7 +948,7 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
             fig_spec_pdf = Figure(dpi=300)
             ax_spec_pdf = fig_spec_pdf.add_subplot(111)
             ax_spec_pdf.plot(x_ppm, y_intensity, color=BORDEAUX, linewidth=1.5)
-            if selected_delta is not None and nmr_type == '1h':
+            if selected_delta is not None and nmr_type in ['1h', 'cosy', 'hmqc', 'hmbc']:
                 ax_spec_pdf.axvspan(selected_delta - width_box, selected_delta + width_box, color=BORDEAUX, alpha=0.18)
             if nmr_type == '13c' and tech in ["DEPT-135", "APT"]: ax_spec_pdf.axhline(0, color='black', linestyle='--', alpha=0.3)
             ax_spec_pdf.set_xlim(x_range[1], x_range[0])
