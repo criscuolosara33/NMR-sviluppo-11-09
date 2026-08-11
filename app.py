@@ -522,7 +522,8 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
                 st.markdown(f"<div class='debug-box'>{log_html}</div>", unsafe_allow_html=True)
 
         x_ppm = np.linspace(x_range[0], x_range[1], int(freq * 200))
-        gamma_base = 0.0025 * (500.0 / freq) if nmr_type == '1h' else 0.5
+        # Correzione del fattore di forma applicato ai grafici monodimensionali in COSY
+        gamma_base = 0.0025 * (500.0 / freq) if nmr_type in ['1h', 'cosy'] else 0.5
         y_intensity = np.zeros_like(x_ppm)
         segnali_visibili = []
 
