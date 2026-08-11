@@ -77,13 +77,22 @@ def ottieni_nomi_pubchem(smiles):
     try:
         url_iupac = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{requests.utils.quote(smiles)}/property/IUPACName/JSON"
         res_iupac = requests.get(url_iupac, timeout=5)
-        iupac = res_iupac.json()['PropertyTable']['Properties'][0]['IUPACName'] if res_iupac.status_code == 200 else "N/D"
+        iupac = "N/D"
+        if res_iupac.status_code == 200:
+            data = res_iupac.json()
+            iupac = data.get('PropertyTable', {}).get('Properties', [{}])[0].get('IUPACName', "N/D")
+            
         url_syn = f"https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/{requests.utils.quote(smiles)}/synonyms/JSON"
         res_syn = requests.get(url_syn, timeout=5)
-        comune = res_syn.json()['InformationList']['Information'][0]['Synonym'][0] if res_syn.status_code == 200 else "N/D"
+        comune = "N/D"
+        if res_syn.status_code == 200:
+            data = res_syn.json()
+            synonyms = data.get('InformationList', {}).get('Information', [{}])[0].get('Synonym', [])
+            comune = synonyms[0] if synonyms else "N/D"
+            
         return iupac, comune
-    except requests.exceptions.RequestException: 
-        return "Errore connessione", "Errore connessione"
+    except Exception: 
+        return "N/D", "N/D"
 
 def analizza_stereochimica(mol):
     Chem.AssignStereochemistry(mol, cleanIt=True, force=True, flagPossibleStereoCenters=True)
@@ -528,8 +537,8 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy",
             plot_title = f'{tech.upper()} 2D ({int(p["freq"])} MHz, {p["solvente"]})'
             x_range = [-0.5, 12.5]
             engine = get_spin_engine(st.session_state.ultimo_smiles, freq, p.get('temp', 25))
-            signals = engine.get_signals_for_ui() # Segnali 1H
-            signals_13c = stima_locale_13c(st.session_state.ultimo_smiles) # Segnali 13C
+            signals = engine.get_signals_for_ui() 
+            signals_13c = stima_locale_13c(st.session_state.ultimo_smiles) 
 
         with st.expander("🔬 NMR DEBUG & Analisi Dinamica (Espandi)"):
             st.markdown("**1. Topologia ed Equivalenza**")
@@ -641,11 +650,9 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy",
         molt_f = len(selected_mult) if len(selected_mult) > 0 else 1
         width_box = (0.05 * molt_f) * (500.0 / freq) if selected_delta else 0
         
-        # zoom_range_x decresce (High -> Low per convenzione asse F2 orizzontale)
         zoom_range_x = [selected_delta + width_box * 2.5, selected_delta - width_box * 2.5] if selected_delta else [x_range[1], x_range[0]]
         
         if nmr_type == 'cosy':
-            # zoom_range_y cresce in Plotly in modo che il limite superiore sia ancorato al basso, mantenendo l'origine a destra
             zoom_range_y = [selected_delta - width_box * 2.5, selected_delta + width_box * 2.5] if selected_delta else [x_range[0], x_range[1]]
 
             st.markdown("---")
@@ -683,7 +690,6 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy",
                         
             Z = Z_diag + Z_cross
 
-            # --- COSY INTEGRATO 2X2 CON ASSI CONDIVISI ---
             fig_cosy = make_subplots(
                 rows=2, cols=2, 
                 shared_xaxes=True, shared_yaxes=True,
@@ -691,7 +697,6 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy",
                 horizontal_spacing=0.015, vertical_spacing=0.015
             )
             
-            # Traccia 1: Spettro 1D Superiore (F2)
             fig_cosy.add_trace(
                 go.Scatter(x=x_ppm, y=y_intensity, mode='lines', line=dict(color=BORDEAUX, width=1.5), fill='tozeroy', fillcolor='rgba(107, 20, 34, 0.1)', hoverinfo='skip'), 
                 row=1, col=1
@@ -699,7 +704,6 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy",
             if selected_delta:
                 fig_cosy.add_vrect(x0=selected_delta + width_box, x1=selected_delta - width_box, fillcolor=BORDEAUX, opacity=0.18, line_width=0, row=1, col=1)
 
-            # Traccia 2: Mappa COSY 2D
             fig_cosy.add_trace(
                 go.Contour(
                     z=Z, x=x_grid, y=x_grid, 
@@ -712,7 +716,6 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy",
             )
             fig_cosy.add_trace(go.Scatter(x=x_range, y=x_range, mode='lines', line=dict(color='rgba(0,0,0,0.3)', dash='dash'), hoverinfo='skip'), row=2, col=1)
 
-            # Traccia 3: Spettro 1D Laterale (F1)
             fig_cosy.add_trace(
                 go.Scatter(x=y_intensity, y=x_ppm, mode='lines', line=dict(color=BORDEAUX, width=1.5), fill='tozerox', fillcolor='rgba(107, 20, 34, 0.1)', hoverinfo='skip'), 
                 row=2, col=2
@@ -783,7 +786,6 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy",
                             cp_int = np.float32(px_int * py_int * 0.5)
                             Z += cp_int / (1.0 + ((X - px) / gamma_x)**2 + ((Y - py) / gamma_y)**2)
                             
-            # Generazione Spettro 13C F1 (Asse Y)
             y_intensity_13c = np.zeros_like(y_grid)
             for sigC in signals_13c:
                 shift = float(sigC['delta'])
@@ -797,7 +799,6 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy",
                 horizontal_spacing=0.015, vertical_spacing=0.015
             )
             
-            # Traccia 1: Spettro 1D Superiore (1H F2)
             fig_hetero.add_trace(
                 go.Scatter(x=x_ppm, y=y_intensity, mode='lines', line=dict(color=BORDEAUX, width=1.5), fill='tozeroy', fillcolor='rgba(107, 20, 34, 0.1)', hoverinfo='skip'), 
                 row=1, col=1
@@ -805,7 +806,6 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy",
             if selected_delta:
                 fig_hetero.add_vrect(x0=selected_delta + width_box, x1=selected_delta - width_box, fillcolor=BORDEAUX, opacity=0.18, line_width=0, row=1, col=1)
 
-            # Traccia 2: Mappa Eteronucleare 2D
             fig_hetero.add_trace(
                 go.Contour(
                     z=Z, x=x_grid, y=y_grid, 
@@ -817,7 +817,6 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy",
                 row=2, col=1
             )
 
-            # Traccia 3: Spettro 1D Laterale (13C F1)
             fig_hetero.add_trace(
                 go.Scatter(x=y_intensity_13c, y=y_grid, mode='lines', line=dict(color=BORDEAUX, width=1.5), fill='tozerox', fillcolor='rgba(107, 20, 34, 0.1)', hoverinfo='skip'), 
                 row=2, col=2
@@ -828,14 +827,13 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy",
                 margin=dict(l=60, r=40, t=60, b=60), hovermode="closest", dragmode="zoom", showlegend=False
             )
             
-            # Formattazione e Ancoraggio Linee di Base
             y_max_13c = np.max(y_intensity_13c) * 1.15 if np.any(y_intensity_13c) else 1
             fig_hetero.update_yaxes(range=[0, y_max], showticklabels=False, showgrid=False, zeroline=False, row=1, col=1)
             fig_hetero.update_xaxes(range=[0, y_max_13c], showticklabels=False, showgrid=False, zeroline=False, row=2, col=2)
             fig_hetero.update_xaxes(showticklabels=False, showgrid=False, zeroline=False, row=1, col=1)
             fig_hetero.update_yaxes(showticklabels=False, showgrid=False, zeroline=False, row=2, col=2)
 
-            zoom_range_y_hetero = [y_range_hetero[0], y_range_hetero[1]] # Standard 13C range
+            zoom_range_y_hetero = [y_range_hetero[0], y_range_hetero[1]]
             
             fig_hetero.update_xaxes(
                 title_text="F2 (1H) - Chemical Shift δ (ppm)", range=zoom_range_x, showgrid=True, gridcolor='#E0E0E0', 
