@@ -618,10 +618,14 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
             ax_high.axis('off')
             st.pyplot(fig_highlight)
 
-        # Determiniamo il range degli assi in base alla selezione utente (Zoom 1D/2D interconnesso)
+        # Configurazione simmetrica degli assi e dello zoom
         molt_f = len(selected_mult) if len(selected_mult) > 0 else 1
         width_box = (0.05 * molt_f) * (500.0 / freq) if selected_delta else 0
-        zoom_range = [selected_delta + width_box * 2.5, selected_delta - width_box * 2.5] if selected_delta else [x_range[1], x_range[0]]
+        
+        # zoom_range_x decresce (High -> Low per convenzione asse F2 orizzontale)
+        zoom_range_x = [selected_delta + width_box * 2.5, selected_delta - width_box * 2.5] if selected_delta else [x_range[1], x_range[0]]
+        # zoom_range_y cresce in Plotly in modo che il limite superiore sia ancorato al basso, mantenendo l'origine a destra
+        zoom_range_y = [selected_delta - width_box * 2.5, selected_delta + width_box * 2.5] if selected_delta else [x_range[0], x_range[1]]
 
         if nmr_type == 'cosy':
             st.markdown("---")
@@ -707,14 +711,14 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
             fig_cosy.update_xaxes(showticklabels=False, showgrid=False, zeroline=False, row=1, col=1)
             fig_cosy.update_yaxes(showticklabels=False, showgrid=False, zeroline=False, row=2, col=2)
 
-            # Assi Principali COSY (Forzatura dei label)
+            # Assi Principali COSY - Correzione orientamento
             fig_cosy.update_xaxes(
-                title_text="F2 - Chemical Shift δ (ppm)", range=zoom_range, showgrid=True, gridcolor='#E0E0E0', 
+                title_text="F2 - Chemical Shift δ (ppm)", range=zoom_range_x, showgrid=True, gridcolor='#E0E0E0', 
                 showticklabels=True, 
                 showspikes=True, spikemode="toaxis+across", spikethickness=1, spikedash="dot", spikecolor="gray", row=2, col=1
             )
             fig_cosy.update_yaxes(
-                title_text="F1 - Chemical Shift δ (ppm)", range=zoom_range, scaleanchor="x", scaleratio=1,
+                title_text="F1 - Chemical Shift δ (ppm)", range=zoom_range_y, 
                 showgrid=True, gridcolor='#E0E0E0', showticklabels=True,
                 showspikes=True, spikemode="toaxis+across", spikethickness=1, spikedash="dot", spikecolor="gray", row=2, col=1
             )
@@ -768,7 +772,7 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
                 )
             
             fig_interattivo.update_layout(title=plot_title, xaxis_title="Chemical Shift δ (ppm)", yaxis_title="Intensità Relativa", plot_bgcolor='white', hovermode='x', height=600, font=dict(family="Palatino, serif"))
-            fig_interattivo.update_xaxes(range=zoom_range, showgrid=True, gridwidth=1, gridcolor='#E0E0E0')
+            fig_interattivo.update_xaxes(range=zoom_range_x, showgrid=True, gridwidth=1, gridcolor='#E0E0E0')
             fig_interattivo.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#E0E0E0', showticklabels=False)
             st.plotly_chart(fig_interattivo, use_container_width=True)
 
