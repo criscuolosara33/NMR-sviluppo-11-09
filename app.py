@@ -653,7 +653,6 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
                 for px, px_int in signals[i]['sub_peaks']:
                     for py, py_int in signals[j]['sub_peaks']:
                         cp_int = np.float32(px_int * py_int * 0.3)
-                        # Ottimizzazione: Evita il broadcasting 3D pesante aggiornando in-place
                         Z_cross += cp_int / (1.0 + ((X - px) / gamma_2d)**2 + ((Y - py) / gamma_2d)**2)
                         Z_cross += cp_int / (1.0 + ((X - py) / gamma_2d)**2 + ((Y - px) / gamma_2d)**2)
                         
@@ -664,12 +663,12 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
                 rows=2, cols=2, 
                 shared_xaxes=True, shared_yaxes=True,
                 column_widths=[0.8, 0.2], row_heights=[0.2, 0.8],
-                horizontal_spacing=0.01, vertical_spacing=0.01
+                horizontal_spacing=0.015, vertical_spacing=0.015
             )
             
             # Traccia 1: Spettro 1D Superiore (F2)
             fig_cosy.add_trace(
-                go.Scatter(x=x_ppm, y=y_intensity, mode='lines', line=dict(color=BORDEAUX, width=1.5), hoverinfo='skip'), 
+                go.Scatter(x=x_ppm, y=y_intensity, mode='lines', line=dict(color=BORDEAUX, width=1.5), fill='tozeroy', fillcolor='rgba(107, 20, 34, 0.1)', hoverinfo='skip'), 
                 row=1, col=1
             )
             if selected_delta:
@@ -690,29 +689,33 @@ elif st.session_state.stato_app in ["calcolo_1h", "calcolo_13c", "calcolo_cosy"]
 
             # Traccia 3: Spettro 1D Laterale (F1)
             fig_cosy.add_trace(
-                go.Scatter(x=y_intensity, y=x_ppm, mode='lines', line=dict(color=BORDEAUX, width=1.5), hoverinfo='skip'), 
+                go.Scatter(x=y_intensity, y=x_ppm, mode='lines', line=dict(color=BORDEAUX, width=1.5), fill='tozerox', fillcolor='rgba(107, 20, 34, 0.1)', hoverinfo='skip'), 
                 row=2, col=2
             )
             if selected_delta:
                 fig_cosy.add_hrect(y0=selected_delta + width_box, y1=selected_delta - width_box, fillcolor=BORDEAUX, opacity=0.18, line_width=0, row=2, col=2)
 
             fig_cosy.update_layout(
-                title=plot_title, width=950, height=950, plot_bgcolor='white', font=dict(family="Palatino, serif"),
-                margin=dict(l=40, r=40, t=60, b=40), hovermode="closest", dragmode="zoom", showlegend=False
+                title=plot_title, width=900, height=900, plot_bgcolor='white', font=dict(family="Palatino, serif"),
+                margin=dict(l=60, r=40, t=60, b=60), hovermode="closest", dragmode="zoom", showlegend=False
             )
             
-            # Nascondi tick non necessari per estetica pulita
-            fig_cosy.update_yaxes(showticklabels=False, showgrid=False, zeroline=False, row=1, col=1)
-            fig_cosy.update_xaxes(showticklabels=False, showgrid=False, zeroline=False, row=2, col=2)
+            # Ancoraggio linee di base 1D a intensità 0 e rimozione label superflui
+            fig_cosy.update_yaxes(range=[0, y_max], showticklabels=False, showgrid=False, zeroline=False, row=1, col=1)
+            fig_cosy.update_xaxes(range=[0, y_max], showticklabels=False, showgrid=False, zeroline=False, row=2, col=2)
+            fig_cosy.update_xaxes(showticklabels=False, showgrid=False, zeroline=False, row=1, col=1)
+            fig_cosy.update_yaxes(showticklabels=False, showgrid=False, zeroline=False, row=2, col=2)
 
-            # Assi Principali COSY (Interconnessi allo zoom di Plotly e alla tabella)
+            # Assi Principali COSY (Forzatura dei label)
             fig_cosy.update_xaxes(
                 title_text="F2 - Chemical Shift δ (ppm)", range=zoom_range, showgrid=True, gridcolor='#E0E0E0', 
+                showticklabels=True, 
                 showspikes=True, spikemode="toaxis+across", spikethickness=1, spikedash="dot", spikecolor="gray", row=2, col=1
             )
             fig_cosy.update_yaxes(
                 title_text="F1 - Chemical Shift δ (ppm)", range=zoom_range, scaleanchor="x", scaleratio=1,
-                showgrid=True, gridcolor='#E0E0E0', showspikes=True, spikemode="toaxis+across", spikethickness=1, spikedash="dot", spikecolor="gray", row=2, col=1
+                showgrid=True, gridcolor='#E0E0E0', showticklabels=True,
+                showspikes=True, spikemode="toaxis+across", spikethickness=1, spikedash="dot", spikecolor="gray", row=2, col=1
             )
             
             st.plotly_chart(fig_cosy, use_container_width=True)
